@@ -219,9 +219,17 @@ impl EventLoop {
 
                             let mut evs = Vec::new();
 
+                            let mut evs_push = |event, mask: EventMask| {
+                                if mask.contains(EventMask::ISDIR) {
+                                    return;
+                                }
+                                evs.push(event);
+                            };
+
                             if event.mask.contains(EventMask::MOVED_FROM) {
                                 remove_watch_by_event(&path, &self.watches, &mut remove_watches);
 
+                                let mask = event.mask;
                                 let event = Event::new(EventKind::Modify(ModifyKind::Name(
                                     RenameMode::From,
                                 )))
@@ -230,12 +238,13 @@ impl EventLoop {
 
                                 self.rename_event = Some(event.clone());
 
-                                evs.push(event);
+                                evs_push(event, mask);
                             } else if event.mask.contains(EventMask::MOVED_TO) {
-                                evs.push(
+                                evs_push(
                                     Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
                                         .set_tracker(event.cookie as usize)
                                         .add_some_path(path.clone()),
+                                    event.mask,
                                 );
 
                                 let trackers_match = self
@@ -248,30 +257,32 @@ impl EventLoop {
 
                                 if trackers_match {
                                     let rename_event = self.rename_event.take().unwrap(); // unwrap is safe because `rename_event` must be set at this point
-                                    evs.push(
+                                    evs_push(
                                         Event::new(EventKind::Modify(ModifyKind::Name(
                                             RenameMode::Both,
                                         )))
                                         .set_tracker(event.cookie as usize)
                                         .add_some_path(rename_event.paths.first().cloned())
                                         .add_some_path(path.clone()),
+                                        event.mask,
                                     );
                                 }
                                 add_watch_by_event(&path, &event, &self.watches, &mut add_watches);
                             }
                             if event.mask.contains(EventMask::MOVE_SELF) {
-                                evs.push(
+                                evs_push(
                                     Event::new(EventKind::Modify(ModifyKind::Name(
                                         RenameMode::From,
                                     )))
                                     .add_some_path(path.clone()),
+                                    event.mask,
                                 );
                                 // TODO stat the path and get to new path
                                 // - emit To and Both events
                                 // - change prefix for further events
                             }
                             if event.mask.contains(EventMask::CREATE) {
-                                evs.push(
+                                evs_push(
                                     Event::new(EventKind::Create(
                                         if event.mask.contains(EventMask::ISDIR) {
                                             CreateKind::Folder
@@ -280,11 +291,12 @@ impl EventLoop {
                                         },
                                     ))
                                     .add_some_path(path.clone()),
+                                    event.mask,
                                 );
                                 add_watch_by_event(&path, &event, &self.watches, &mut add_watches);
                             }
                             if event.mask.contains(EventMask::DELETE) {
-                                evs.push(
+                                evs_push(
                                     Event::new(EventKind::Remove(
                                         if event.mask.contains(EventMask::ISDIR) {
                                             RemoveKind::Folder
@@ -293,6 +305,7 @@ impl EventLoop {
                                         },
                                     ))
                                     .add_some_path(path.clone()),
+                                    event.mask,
                                 );
                                 remove_watch_by_event(&path, &self.watches, &mut remove_watches);
                             }
@@ -313,50 +326,56 @@ impl EventLoop {
                                         RemoveKind::Other
                                     }
                                 };
-                                evs.push(
+                                evs_push(
                                     Event::new(EventKind::Remove(remove_kind))
                                         .add_some_path(path.clone()),
+                                    event.mask,
                                 );
                                 remove_watch_by_event(&path, &self.watches, &mut remove_watches);
                             }
                             if event.mask.contains(EventMask::MODIFY) {
-                                evs.push(
+                                evs_push(
                                     Event::new(EventKind::Modify(ModifyKind::Data(
                                         DataChange::Any,
                                     )))
                                     .add_some_path(path.clone()),
+                                    event.mask,
                                 );
                             }
                             if event.mask.contains(EventMask::CLOSE_WRITE) {
-                                evs.push(
+                                evs_push(
                                     Event::new(EventKind::Access(AccessKind::Close(
                                         AccessMode::Write,
                                     )))
                                     .add_some_path(path.clone()),
+                                    event.mask,
                                 );
                             }
                             if event.mask.contains(EventMask::CLOSE_NOWRITE) {
-                                evs.push(
+                                evs_push(
                                     Event::new(EventKind::Access(AccessKind::Close(
                                         AccessMode::Read,
                                     )))
                                     .add_some_path(path.clone()),
+                                    event.mask,
                                 );
                             }
                             if event.mask.contains(EventMask::ATTRIB) {
-                                evs.push(
+                                evs_push(
                                     Event::new(EventKind::Modify(ModifyKind::Metadata(
                                         MetadataKind::Any,
                                     )))
                                     .add_some_path(path.clone()),
+                                    event.mask,
                                 );
                             }
                             if event.mask.contains(EventMask::OPEN) {
-                                evs.push(
+                                evs_push(
                                     Event::new(EventKind::Access(AccessKind::Open(
                                         AccessMode::Any,
                                     )))
                                     .add_some_path(path.clone()),
+                                    event.mask,
                                 );
                             }
 
