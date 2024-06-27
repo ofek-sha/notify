@@ -416,12 +416,20 @@ impl EventLoop {
             return self.add_single_watch(path, false, true);
         }
 
+        const EXCLUSIONS: &[&str] = &["/proc/", "/sys/", "/boot/", "/dev/", "/udev/", "/mnt/"];
+
         for entry in WalkDir::new(path)
             .follow_links(true)
             .into_iter()
             .filter_map(filter_dir)
         {
-            self.add_single_watch(entry.path().to_path_buf(), is_recursive, watch_self)?;
+            let path = entry.path().to_path_buf();
+
+            if EXCLUSIONS.iter().any(|o| path.starts_with(*o)) {
+                continue;
+            }
+
+            self.add_single_watch(path, is_recursive, watch_self)?;
             watch_self = false;
         }
 
