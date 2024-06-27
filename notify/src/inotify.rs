@@ -442,6 +442,7 @@ impl EventLoop {
             | WatchMask::MOVED_FROM
             | WatchMask::MOVED_TO;
 
+        watchmask.remove(WatchMask::ATTRIB);
         watchmask.insert(WatchMask::ACCESS);
         watchmask.insert(WatchMask::OPEN);
 
