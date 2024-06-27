@@ -421,15 +421,10 @@ impl EventLoop {
         for entry in WalkDir::new(path)
             .follow_links(true)
             .into_iter()
+            .filter_entry(|p| !EXCLUSIONS.iter().any(|e| p.path().starts_with(*e)))
             .filter_map(filter_dir)
         {
-            let path = entry.path().to_path_buf();
-
-            if EXCLUSIONS.iter().any(|o| path.starts_with(*o)) {
-                continue;
-            }
-
-            self.add_single_watch(path, is_recursive, watch_self)?;
+            self.add_single_watch(entry.path().to_path_buf(), is_recursive, watch_self)?;
             watch_self = false;
         }
 
