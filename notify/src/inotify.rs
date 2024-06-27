@@ -422,7 +422,8 @@ impl EventLoop {
             .follow_links(true)
             .into_iter()
             .filter_entry(|p| !EXCLUSIONS.iter().any(|e| p.path().starts_with(*e)))
-            .filter_map(filter_dir)
+            .filter_map(|p| p.ok())
+            .filter(|p| p.file_type().is_dir())
         {
             self.add_single_watch(entry.path().to_path_buf(), is_recursive, watch_self)?;
             watch_self = false;
@@ -533,18 +534,6 @@ impl EventLoop {
         }
         Ok(())
     }
-}
-
-/// return `DirEntry` when it is a directory
-fn filter_dir(e: walkdir::Result<walkdir::DirEntry>) -> Option<walkdir::DirEntry> {
-    if let Ok(e) = e {
-        if let Ok(metadata) = e.metadata() {
-            if metadata.is_dir() {
-                return Some(e);
-            }
-        }
-    }
-    None
 }
 
 impl INotifyWatcher {
